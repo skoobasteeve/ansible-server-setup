@@ -25,11 +25,11 @@ This [Ansible](https://www.ansible.com/) playbook is intended to be used on all 
 
 While the playbook can target single devices, it was designed to run repeatedly on multiple servers to ensure compliance with the stated goals. If you're not me, you'll probably want to tweak the playbook to your liking, but the below steps should get you going.
 
-1. Clone the repository
+1. Clone the repository.
 2. Add your hosts to the `hosts` file in the repo (or use your own inventory)
 3. Edit the `group_vars/all` file with your own data. If something doesn't apply to your environment, you can leave it blank.
 4. Add your SSH keys to `roles/common/files/keys-default`. These will be added to the `authorized_keys` file of each host you target.
-5. Run the playbook
+5. Run the playbook:
    ```
    cd ansible-server-setup
    ansible-playbook site.yml -K -i hosts
