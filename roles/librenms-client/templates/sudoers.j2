@@ -1,0 +1,9 @@
+{% if "zfs-zed" in ansible_facts.packages %}
+Debian-snmp ALL=(ALL) NOPASSWD: /etc/snmp/zfs-linux
+{% endif %}
+{% if "docker" in ansible_facts.services %}
+Debian-snmp ALL=(ALL) NOPASSWD: /etc/snmp/docker-stats.sh
+{% endif %}
+{% if pihole.stat.exists %}
+Debian-snmp ALL=(ALL) NOPASSWD: /bin/sh /etc/snmp/raspberry.sh
+{% endif %}

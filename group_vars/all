@@ -1,0 +1,13 @@
+---
+# common
+remote_user: 
+ssh_keyfile: 
+
+# librenms-client
+pihole01_key: ""
+pihole02_key: ""
+snmp_community: ""
+librenms_ip: 
+
+# tailscale
+tailscale_key: ""

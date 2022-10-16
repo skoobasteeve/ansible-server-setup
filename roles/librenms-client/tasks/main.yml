@@ -1,0 +1,171 @@
+---
+- name: check for pihole
+  ansible.builtin.stat:
+    path: "/usr/local/bin/pihole"
+  register: pihole
+
+- name: install latest snmpd - debian
+  package: name=snmpd state=latest
+  when: ansible_os_family == "Debian"
+
+- name: install latest snmpd - centos
+  package: name=net-snmp state=latest
+  when: ansible_distribution_file_variety == "RedHat"
+
+- name: install latest jq
+  package: name=jq state=latest
+
+- name: fix extend serial permissions
+  ansible.builtin.file:
+    path: "/sys/devices/virtual/dmi/id/product_serial"
+    mode: '444'
+  when: ansible_architecture == "x86_64" and ansible_virtualization_role != "guest"
+
+- name: cron job for extend serial permissions
+  ansible.builtin.lineinfile:
+    path: /etc/crontab
+    line: "@reboot chmod 444 /sys/devices/virtual/dmi/id/product_serial"
+  when: ansible_architecture == "x86_64"
+
+- name: download script for extend distro
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/librenms/librenms-agent/master/snmp/distro"
+    dest: "/usr/bin/distro"
+    mode: '755'
+
+- name: download script for extend osupdates
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/librenms/librenms-agent/master/snmp/osupdate"
+    dest: "/etc/snmp/osupdate"
+    mode: '755'
+
+- name: download script for extend zfs
+  ansible.builtin.get_url:
+    url: "https://github.com/librenms/librenms-agent/raw/master/snmp/zfs-linux"
+    dest: "/etc/snmp/zfs-linux"
+    mode: '755'
+  when: "'zfs-zed' in ansible_facts.packages"
+
+- name: download script for extend docker
+  ansible.builtin.get_url:
+    url: "https://github.com/librenms/librenms-agent/raw/master/snmp/docker-stats.sh"
+    dest: "/etc/snmp/docker-stats.sh"
+    mode: '755'
+  when: "'docker' in services"
+
+- name: download script for extend pihole
+  ansible.builtin.get_url:
+    url: "https://github.com/librenms/librenms-agent/raw/master/snmp/pi-hole"
+    dest: "/etc/snmp/pi-hole"
+    mode: '755'
+  when: pihole.stat.exists
+
+- name: download script for extend raspberrypi
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/librenms/librenms-agent/master/snmp/raspberry.sh"
+    dest: "/etc/snmp/raspberry.sh"
+    mode: '755'
+  when: ansible_os_family == "Debian" and ansible_lsb.id == 'Raspbian'
+
+- name: add api key to pihole script for pihole01
+  ansible.builtin.lineinfile:
+    path: "/etc/snmp/pi-hole"
+    regexp: '^API_AUTH_KEY='
+    line: 'API_AUTH_KEY="{{ pihole01_key }}"'
+    backrefs: yes
+  when: ansible_hostname == "pihole01"
+
+- name: add api key to pihole script for pihole02
+  ansible.builtin.lineinfile:
+    path: "/etc/snmp/pi-hole"
+    regexp: '^API_AUTH_KEY='
+    line: 'API_AUTH_KEY="{{ pihole02_key }}"'
+    backrefs: yes
+  when: ansible_hostname == "pihole02"
+
+- name: set ExecStart options in service file - ubuntu
+  ansible.builtin.lineinfile:
+    path: "/lib/systemd/system/snmpd.service"
+    regexp: '^ExecStart='
+    line: "ExecStart=/usr/sbin/snmpd -LS4d -Lf /dev/null -u Debian-snmp -g Debian-snmp -I -smux,mteTrigger,mteTriggerConf -f"
+    backrefs: yes
+  when: ansible_os_family == "Debian"
+  notify: reload systemd configs
+
+- name: set snmpdopts - centos
+  ansible.builtin.lineinfile:
+    path: "/etc/sysconfig/snmpd"
+    regexp: '^# OPTIONS=|^OPTIONS='
+    line: 'OPTIONS="-LS4-6d"'
+  when: ansible_distribution_file_variety == "RedHat"
+
+- name: copy snmpd.conf from template
+  register: snmpd_config 
+  ansible.builtin.template:
+    src: snmpd.conf.j2
+    dest: "/etc/snmp/snmpd.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: 
+    - enable and restart snmpd.service
+
+- name: add host to librenms
+  # when: snmpd_config.changed
+  block:
+    - name: Try adding by hostname
+      command:
+        cmd: "/usr/bin/lnms device:add --v2c -c {{ snmp_community }} {{ inventory_hostname }}"
+      become: yes
+      become_user: librenms
+      delegate_to: nms.lyon
+      register: lnms_add_by_hostname
+  rescue:
+    - name: Add by IP when hostname fails
+      command:
+        cmd: "/opt/librenms/snmp-scan.py -v -r {{ ansible_default_ipv4.address }}/32"
+      become: yes
+      become_user: librenms
+      delegate_to: nms.lyon
+      register: lnms_add_by_ip
+
+- name: check librenms add by hostname status
+  when: lnms_add_by_hostname.changed
+  ansible.builtin.debug:
+   msg: "{{ lnms_add_by_hostname.stdout }}"
+
+- name: check librenms add by ip status
+  when: lnms_add_by_ip.changed
+  ansible.builtin.debug:
+   msg: "{{ lnms_add_by_ip.stdout }}"
+
+- name: copy sudoers from template
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/80-snmp"
+    owner: root
+    group: root
+    mode: '0440'
+
+- name: copy rsyslog config from template
+  ansible.builtin.template:
+    src: rsyslog.conf.j2
+    dest: "/etc/rsyslog.d/librenms.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: 
+    - enable and restart the rsyslog service
+    - restart syslog-ng for LibreNMS
+
+- name: verify the rsyslog service is running
+  ansible.builtin.systemd:
+    state: started
+    name: rsyslog
+
+- name: verify the snmpd service is running
+  ansible.builtin.systemd:
+    state: started
+    name: snmpd
+
+

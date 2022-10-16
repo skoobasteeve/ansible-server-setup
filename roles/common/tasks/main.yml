@@ -1,0 +1,61 @@
+---
+- name: get package facts
+  ansible.builtin.package_facts:
+
+- name: get service facts
+  service_facts:
+
+- name: add default ssh keys
+  authorized_key:
+    key: "{{ lookup('file', '{{ ssh_keyfile }}') }}"
+    user: "{{ remote_user }}"
+    state: present
+    exclusive: True
+  when: "'mothershipbu.lyon' not in inventory_hostname"
+
+- name: add default ssh keys - mothershipbu
+  authorized_key:
+    key: "{{ lookup('file', 'keys-mothershipbu') }}"
+    user: "{{ remote_user }}"
+    state: present
+    exclusive: True
+  when: "'mothershipbu.lyon' in inventory_hostname"
+
+- name: disable password ssh auth
+  ansible.builtin.lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: '^PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+    backrefs: yes
+  notify: restart ssh service - {{ ansible_distribution_file_variety }}
+
+- name: automatic security updates - debian
+  package: name=unattended-upgrades state=latest
+  when: ansible_distribution_file_variety == "Debian"
+
+- name: automatic security updates - redhat
+  package: name=dnf-automatic state=latest
+  when: ansible_distribution_file_variety == "RedHat"
+
+- name: configure automatic security updates step 01 - redhat
+  ansible.builtin.lineinfile:
+    path: "/etc/dnf/automatic.conf"
+    regexp: '^upgrade_type ='
+    line: 'upgrade_type = security'
+    backrefs: yes
+  when: ansible_distribution_file_variety == "RedHat"
+
+- name: configure automatic security updates step 02 - redhat
+  ansible.builtin.lineinfile:
+    path: "/etc/dnf/automatic.conf"
+    regexp: '^apply_updates ='
+    line: 'apply_updates = yes'
+    backrefs: yes
+  when: ansible_distribution_file_variety == "RedHat"
+  
+- name: enable and start dnf-automatic.timer - redhat
+  ansible.builtin.systemd:
+    state: started
+    enabled: yes
+    name: dnf-automatic.timer
+  when: ansible_distribution_file_variety == "RedHat"

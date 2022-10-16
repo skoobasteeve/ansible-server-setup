@@ -1,0 +1,23 @@
+---
+- name: reload systemd configs
+  ansible.builtin.systemd:
+    daemon_reload: yes
+    
+- name: enable and restart snmpd.service
+  ansible.builtin.systemd:
+    state: restarted
+    enabled: yes
+    name: snmpd
+  listen: enable and restart snmpd.service
+
+- name: enable and restart the rsyslog service
+  ansible.builtin.systemd:
+    state: restarted
+    enabled: yes
+    name: rsyslog
+
+- name: restart syslog-ng for LibreNMS
+  ansible.builtin.systemd:
+    state: restarted
+    name: syslog-ng
+  delegate_to: nms.lyon

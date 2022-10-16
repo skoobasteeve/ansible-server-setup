@@ -1,0 +1,2 @@
+# SSH public keys for all devices that will access the server.
+# Backup server needs to grant access to my primary VM host for ZFS snapshot replication, so this additional file is needed.

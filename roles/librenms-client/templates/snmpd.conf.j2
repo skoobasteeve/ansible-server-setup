@@ -1,0 +1,47 @@
+# Change RANDOMSTRINGGOESHERE to your preferred SNMP community string
+com2sec readonly  default         {{ snmp_community }}
+
+group MyROGroup v2c        readonly
+view all    included  .1                               80
+access MyROGroup ""      any       noauth    exact  all    none   none
+
+syslocation Home
+syscontact Ray Lyon <ray@raylyon.net>
+
+agentAddress udp:161,udp6:[::1]:161
+rocommunity {{ snmp_community }}
+
+#OS Distribution Detection
+extend distro /usr/bin/distro
+
+#OS Updates
+extend osupdate /etc/snmp/osupdate
+
+#Hardware Detection
+{% if ansible_architecture == "x86_64" %}
+extend manufacturer '/bin/cat /sys/devices/virtual/dmi/id/sys_vendor'
+extend hardware '/bin/cat /sys/devices/virtual/dmi/id/product_name'
+extend serial '/bin/cat /sys/devices/virtual/dmi/id/product_serial'
+{% endif %}
+
+{% if ansible_architecture == "armv6l" %}
+extend hardware '/bin/cat /sys/firmware/devicetree/base/model'
+extend serial '/bin/cat /sys/firmware/devicetree/base/serial-number'
+{% endif %}
+
+#Extended scripts
+{% if "nfs-kernel-server" in ansible_facts.services %}
+extend nfs-server /bin/cat /proc/net/rpc/nfsd
+{% endif %}
+{% if "zfs-zed" in ansible_facts.packages %}
+extend zfs '/usr/bin/sudo /etc/snmp/zfs-linux'
+{% endif %}
+{% if "docker" in ansible_facts.services %}
+extend docker /usr/bin/sudo /etc/snmp/docker-stats.sh
+{% endif %}
+{% if pihole.stat.exists %}
+extend pi-hole /etc/snmp/pi-hole
+{% endif %}
+{% if ansible_os_family == "Debian" and ansible_lsb.id == 'Raspbian' %}
+extend raspberry /usr/bin/sudo /bin/sh /etc/snmp/raspberry.sh
+{% endif %}
