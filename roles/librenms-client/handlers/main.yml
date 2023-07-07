@@ -1,23 +1,33 @@
 ---
-- name: reload systemd configs
+- name: Reload systemd configs
   ansible.builtin.systemd:
-    daemon_reload: yes
-    
-- name: enable and restart snmpd.service
+    daemon_reload: true
+
+- name: Enable and restart snmpd.service
   ansible.builtin.systemd:
     state: restarted
-    enabled: yes
+    enabled: true
     name: snmpd
   listen: enable and restart snmpd.service
 
-- name: enable and restart the rsyslog service
+- name: Enable and restart the rsyslog service
   ansible.builtin.systemd:
     state: restarted
-    enabled: yes
+    enabled: true
     name: rsyslog
 
-- name: restart syslog-ng for LibreNMS
+- name: Restart syslog-ng for LibreNMS
   ansible.builtin.systemd:
     state: restarted
     name: syslog-ng
   delegate_to: nms.lyon
+
+- name: Check librenms add by hostname status
+  when: lnms_add_by_hostname.changed
+  ansible.builtin.debug:
+    msg: "{{ lnms_add_by_hostname.stdout }}"
+
+- name: Check librenms add by ip status
+  when: lnms_add_by_ip.changed
+  ansible.builtin.debug:
+    msg: "{{ lnms_add_by_ip.stdout }}"
