@@ -21,6 +21,11 @@
     name: jq
     state: present
 
+- name: Install latest rsyslog
+  ansible.builtin.package:
+    name: rsyslog
+    state: present
+
 - name: Fix extend serial permissions
   ansible.builtin.file:
     path: "/sys/devices/virtual/dmi/id/product_serial"
@@ -96,7 +101,7 @@
     line: "ExecStart=/usr/sbin/snmpd -LS4d -Lf /dev/null -u Debian-snmp -g Debian-snmp -I -smux,mteTrigger,mteTriggerConf -f"
     backrefs: true
   when: ansible_os_family == "Debian"
-  notify: reload systemd configs
+  notify: Reload systemd configs
 
 - name: Set snmpdopts - centos
   ansible.builtin.lineinfile:
@@ -114,7 +119,7 @@
     mode: '0644'
   register: snmpd_config
   notify:
-    - enable and restart snmpd.service
+    - Enable and restart snmpd.service
 
 - name: Add host to librenms
   block:
@@ -154,8 +159,8 @@
     group: root
     mode: '0644'
   notify:
-    - enable and restart the rsyslog service
-    - restart syslog-ng for LibreNMS
+    - Enable and restart the rsyslog service
+    - Restart syslog-ng for LibreNMS
 
 - name: Verify the rsyslog service is running
   ansible.builtin.systemd:
