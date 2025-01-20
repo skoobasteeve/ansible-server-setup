@@ -59,8 +59,8 @@
 
 - name: Download script for extend docker
   ansible.builtin.get_url:
-    url: "https://github.com/librenms/librenms-agent/raw/master/snmp/docker-stats.sh"
-    dest: "/etc/snmp/docker-stats.sh"
+    url: "https://raw.githubusercontent.com/librenms/librenms-agent/refs/heads/master/snmp/docker-stats.py"
+    dest: "/etc/snmp/docker-stats.py"
     mode: '755'
   when: "'docker' in services"
 
